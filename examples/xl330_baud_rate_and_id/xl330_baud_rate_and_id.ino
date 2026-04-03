@@ -21,7 +21,7 @@
 XL330 robot;  // Name your robot
 
 //Set the desired ID for your servo
-int servoID = 2;  // 254: broadcast; id value: 0~253
+int servoID = 1;  // 254: broadcast; id value: 0~253
 
 // If you want to use hardware Serial instead, comment following lines
 #include <SoftwareSerial.h>

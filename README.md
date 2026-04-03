@@ -1,9 +1,9 @@
-Dynamixel XL-330
+Dynamixel XL-430
 ================
-This library is developed based on the code from [hackerspace-adelaide/XL320](https://github.com/hackerspace-adelaide/XL320). The modification is made by [Rei Lee](https://www.rei-lee.com).
+This library is developed based on the code from [Rei Lee](https://github.com/rei039474/Dynamixel_XL330_Servo_Library).
 
 
-This is a library created to control Dynamixel XL-330 servos directly with microcontrollers. It works for both [XL330-M077-T](https://emanual.robotis.com/docs/en/dxl/x/xl330-m077/) and [XL330-M288-T](https://emanual.robotis.com/docs/en/dxl/x/xl330-m288/) models and has been tested with Arduino and ESP32 boards. Please refer to Dynamixel website for more info about the servos.
+This is a library created to control Dynamixel XL-330 servos directly with microcontrollers. It works for [XL430-W250-T](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/) models and has been tested with Arduino boards. Please refer to Dynamixel website for more info about the servos.
 
 **It is still work in progress... not ready yet, but can be used for simple PWM and Position control.**
 
@@ -12,7 +12,7 @@ This is a library created to control Dynamixel XL-330 servos directly with micro
 <img src="XL330_Arduino.jpg" width="50%" alt="Dynamixel XL-330 servo library for microcontroller" title="Dynamixel XL-330 servo library for microcontroller">
 
 
-# A XL-330 Servo library for Arduino
+# A XL-430 Servo library for Arduino
 
 Clone this repository into your Arduino IDE libraries folder:
 

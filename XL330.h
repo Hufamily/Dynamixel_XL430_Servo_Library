@@ -76,6 +76,17 @@
 #define XL_PRESENT_TEMPERATURE      146
 #define XL_BACKUP_READY             147
 
+/*Protocol 2.0 Instructions*/
+#define XL_INSTR_PING               0x01
+#define XL_INSTR_READ               0x02
+#define XL_INSTR_WRITE              0x03
+#define XL_INSTR_REG_WRITE          0x04
+#define XL_INSTR_ACTION             0x05
+#define XL_INSTR_FACTORY_RESET      0x06
+#define XL_INSTR_REBOOT             0x08
+#define XL_INSTR_CLEAR              0x10
+#define XL_INSTR_CONTROL_TABLE_BACKUP 0x20
+
 #include <inttypes.h>
 #include <Stream.h>
 
@@ -111,6 +122,17 @@ public:
 	int getJointTemperature(int id);
 	int isJointMoving(int id);
 
+	int ping(int id);
+	int action(int id);
+	int reboot(int id);
+	int factoryReset(int id, int option);
+	int clearMultiTurnInfo(int id);
+	int controlTableBackup(int id, int option);
+
+	int regWrite(int id, int Address, int value);
+	int regWrite_4bytes(int id, int Address, int value);
+	int regWrite_1byte(int id, int Address, int value);
+
 	int sendPacket(int id, int Address, int value);
 	int readPacket(unsigned char *buffer, size_t size);
 	int sendPacket_4bytes(int id, int Address, int value);
@@ -119,7 +141,7 @@ public:
 	int RXsendPacket(int id, int Address);
 	int RXsendPacket(int id, int Address, int size);
 
-	int flush();
+	void flush();
 
 	class Packet {
 	  bool freeData;

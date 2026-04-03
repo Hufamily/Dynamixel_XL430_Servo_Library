@@ -128,40 +128,212 @@ int XL330::getJointPosition(int id) {
 	unsigned char buffer[255];
 	RXsendPacket(id, XL_PRESENT_POSITION, 4);
 	this->stream->flush();
-	if (this->readPacket(buffer, 255) > 0) {
-		Packet p(buffer, 255);
-		if (p.isValid() && p.getParameterCount() >= 3 && p.getInstruction() == 0x55) { 
-			return (p.getParameter(1)) |
-                  (p.getParameter(2) << 8) |
-                  (p.getParameter(3) << 16) |
-                  (p.getParameter(4) << 24);
-		}
-		else {
-			return -1;
-		}
+	nDelay(NANO_TIME_DELAY);
+
+	int packetSize = this->readPacket(buffer, sizeof(buffer));
+	if (packetSize <= 0) {
+		return -2;
 	}
-	return -2;
+
+	Packet p(buffer, packetSize);
+	if (!p.isValid() || p.getInstruction() != 0x55 || p.getParameterCount() < 5 || p.getParameter(0) != 0) {
+		return -1;
+	}
+
+	int value = (p.getParameter(1)) |
+		(p.getParameter(2) << 8) |
+		(p.getParameter(3) << 16) |
+		(p.getParameter(4) << 24);
+
+	return value;
 }
 
 int XL330::getJointSpeed(int id) {
-	int speed = RXsendPacket(id, XL_PRESENT_VELOCITY);
+	unsigned char buffer[255];
+	RXsendPacket(id, XL_PRESENT_VELOCITY, 4);
 	this->stream->flush();
 	nDelay(NANO_TIME_DELAY);
-	return speed;
+
+	int packetSize = this->readPacket(buffer, sizeof(buffer));
+	if (packetSize <= 0) {
+		return -2;
+	}
+
+	Packet p(buffer, packetSize);
+	if (!p.isValid() || p.getInstruction() != 0x55 || p.getParameterCount() < 5 || p.getParameter(0) != 0) {
+		return -1;
+	}
+
+	int value = (p.getParameter(1)) |
+		(p.getParameter(2) << 8) |
+		(p.getParameter(3) << 16) |
+		(p.getParameter(4) << 24);
+
+	return value;
 }
 
 int XL330::getJointTemperature(int id) {
-	int temp = RXsendPacket(id, XL_PRESENT_TEMPERATURE);
+	unsigned char buffer[255];
+	RXsendPacket(id, XL_PRESENT_TEMPERATURE, 1);
 	this->stream->flush();
 	nDelay(NANO_TIME_DELAY);
-	return temp;
+
+	int packetSize = this->readPacket(buffer, sizeof(buffer));
+	if (packetSize <= 0) {
+		return -2;
+	}
+
+	Packet p(buffer, packetSize);
+	if (!p.isValid() || p.getInstruction() != 0x55 || p.getParameterCount() < 2 || p.getParameter(0) != 0) {
+		return -1;
+	}
+
+	return p.getParameter(1);
 }
 
 int XL330::isJointMoving(int id) {
-	int motion = RXsendPacket(id, XL_MOVING);
+	unsigned char buffer[255];
+	RXsendPacket(id, XL_MOVING, 1);
 	this->stream->flush();
 	nDelay(NANO_TIME_DELAY);
-	return motion;
+
+	int packetSize = this->readPacket(buffer, sizeof(buffer));
+	if (packetSize <= 0) {
+		return -2;
+	}
+
+	Packet p(buffer, packetSize);
+	if (!p.isValid() || p.getInstruction() != 0x55 || p.getParameterCount() < 2 || p.getParameter(0) != 0) {
+		return -1;
+	}
+
+	return p.getParameter(1);
+}
+
+int XL330::ping(int id) {
+	const int bufsize = 10;
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_PING, 0);
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
+}
+
+int XL330::action(int id) {
+	const int bufsize = 10;
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_ACTION, 0);
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
+}
+
+int XL330::reboot(int id) {
+	const int bufsize = 10;
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_REBOOT, 0);
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
+}
+
+int XL330::factoryReset(int id, int option) {
+	const int bufsize = 11;
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_FACTORY_RESET, 1,
+		DXL_0BYTE(option));
+
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
+}
+
+int XL330::clearMultiTurnInfo(int id) {
+	const int bufsize = 15;
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_CLEAR, 5,
+		0x01,
+		0x44,
+		0x58,
+		0x4C,
+		0x22);
+
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
+}
+
+int XL330::controlTableBackup(int id, int option) {
+	const int bufsize = 15;
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_CONTROL_TABLE_BACKUP, 5,
+		DXL_0BYTE(option),
+		0x43,
+		0x54,
+		0x52,
+		0x4C);
+
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
+}
+
+int XL330::regWrite(int id, int Address, int value) {
+	// For sending 2-byte data with REG_WRITE instruction.
+	const int bufsize = 16;
+
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_REG_WRITE, 4,
+		DXL_0BYTE(Address),
+		DXL_1BYTE(Address),
+		DXL_0BYTE(value),
+		DXL_1BYTE(value));
+
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
+}
+
+int XL330::regWrite_4bytes(int id, int Address, int value) {
+	// For sending 4-byte data with REG_WRITE instruction.
+	const int bufsize = 18;
+
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_REG_WRITE, 6,
+		DXL_0BYTE(Address),
+		DXL_1BYTE(Address),
+		DXL_0BYTE(value),
+		DXL_1BYTE(value),
+		DXL_2BYTE(value),
+		DXL_3BYTE(value));
+
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
+}
+
+int XL330::regWrite_1byte(int id, int Address, int value) {
+	// For sending 1 byte data with REG_WRITE instruction.
+	const int bufsize = 18;
+
+	byte txbuffer[bufsize];
+
+	Packet p(txbuffer, bufsize, id, XL_INSTR_REG_WRITE, 3,
+		DXL_0BYTE(Address),
+		DXL_1BYTE(Address),
+		DXL_0BYTE(value));
+
+	int size = p.getSize();
+	stream->write(txbuffer, size);
+	return size;
 }
 
 int XL330::sendPacket(int id, int Address, int value) {
@@ -181,7 +353,7 @@ int XL330::sendPacket(int id, int Address, int value) {
 
 	int size = p.getSize();
 	stream->write(txbuffer, size);
-	return bufsize;
+	return size;
 }
 
 int XL330::sendPacket_4bytes(int id, int Address, int value) {
@@ -203,7 +375,7 @@ int XL330::sendPacket_4bytes(int id, int Address, int value) {
 
 	int size = p.getSize();
 	stream->write(txbuffer, size);
-	return bufsize;
+	return size;
 }
 
 int XL330::sendPacket_1byte(int id, int Address, int value) {
@@ -222,7 +394,7 @@ int XL330::sendPacket_1byte(int id, int Address, int value) {
 
 	int size = p.getSize();
 	stream->write(txbuffer, size);
-	return bufsize;
+	return size;
 }
 
 
@@ -235,7 +407,7 @@ void XL330::nDelay(uint32_t nTime) {
 	*/
 }
 
-int XL330::flush() {
+void XL330::flush() {
 	this->stream->flush();
 }
 
@@ -253,95 +425,95 @@ int XL330::RXsendPacket(int id, int Address, int size) {
 
 	byte txbuffer[bufsize];
 
-	Packet p(txbuffer, bufsize, id, 0x02, 4,
+	Packet p(txbuffer, bufsize, id, XL_INSTR_READ, 4,
 		DXL_0BYTE(Address),
 		DXL_1BYTE(Address),
 		DXL_0BYTE(size),
 		DXL_1BYTE(size));
 
+	int requestSize = p.getSize();
+	stream->write(txbuffer, requestSize);
 
-	stream->write(txbuffer, p.getSize());
-
-	//stream->write(txbuffer,bufsize);
-
-	return p.getSize();
+	return requestSize;
 }
 
-// from http://stackoverflow.com/a/133363/195061
-
-#define FSM
-#define STATE(x)        s_##x : if(!stream->readBytes(&BUFFER[I++],1)) goto sx_timeout ; if(I>=SIZE) goto sx_overflow; sn_##x :
-#define THISBYTE        (BUFFER[I-1])
-#define NEXTSTATE(x)    goto s_##x
-#define NEXTSTATE_NR(x) goto sn_##x
-#define OVERFLOW        sx_overflow :
-#define TIMEOUT         sx_timeout :
-
 int XL330::readPacket(unsigned char* BUFFER, size_t SIZE) {
-	int C;
-	int I = 0;
-
-	int length = 0;
-
-	// state names normally name the last parsed symbol
-
-
-	FSM{
-	  STATE(start) {
-	if (THISBYTE == 0xFF) NEXTSTATE(header_ff_1);
-	I = 0; NEXTSTATE(start);
-	  }
-	  STATE(header_ff_1) {
-	if (THISBYTE == 0xFF) NEXTSTATE(header_ff_2);
-	I = 0; NEXTSTATE(start);
-	  }
-	  STATE(header_ff_2) {
-	if (THISBYTE == 0xFD) NEXTSTATE(header_fd);
-	// yet more 0xFF's? stay in this state
-	if (THISBYTE == 0xFF) NEXTSTATE(header_ff_2);
-	// anything else? restart
-	I = 0; NEXTSTATE(start);
-	  }
-	  STATE(header_fd) {
-		  // reading reserved, could be anything in theory, normally 0
-		  }
-		  STATE(header_reserved) {
-			  // id = THISBYTE
-			  }
-			  STATE(id) {
-			length = THISBYTE;
-			  }
-			  STATE(length_1) {
-			length += THISBYTE << 8; // eg: length=4
-			  }
-			  STATE(length_2) {
-			  }
-			  STATE(instr) {
-				  // instr = THISBYTE
-					  // check length because
-					  // action and reboot commands have no parameters
-				  if (I - length >= 5) NEXTSTATE(checksum_1);
-					}
-					STATE(params) {
-						// check length and maybe skip to checksum
-						if (I - length >= 5) NEXTSTATE(checksum_1);
-						// or keep reading params
-						NEXTSTATE(params);
-						}
-						STATE(checksum_1) {
-						}
-						STATE(checksum_2) {
-							// done
-							return I;
-							}
-							OVERFLOW {
-								return -1;
-							}
-							TIMEOUT {
-							return -2;
-							}
-
+	if (!BUFFER || SIZE < 10) {
+		return -1;
 	}
+
+	int i = 0;
+	unsigned char byte = 0;
+
+	// Find the protocol 2.0 header (FF FF FD 00).
+	while (true) {
+		if (!stream->readBytes(&byte, 1)) {
+			return -2;
+		}
+
+		if (i == 0 && byte == 0xFF) {
+			BUFFER[i++] = byte;
+			continue;
+		}
+
+		if (i == 1) {
+			if (byte == 0xFF) {
+				BUFFER[i++] = byte;
+				continue;
+			}
+			i = 0;
+			if (byte == 0xFF) {
+				BUFFER[i++] = byte;
+			}
+			continue;
+		}
+
+		if (i == 2) {
+			if (byte == 0xFD) {
+				BUFFER[i++] = byte;
+				continue;
+			}
+			if (byte == 0xFF) {
+				BUFFER[0] = 0xFF;
+				BUFFER[1] = 0xFF;
+				i = 2;
+				continue;
+			}
+			i = 0;
+			continue;
+		}
+
+		if (byte != 0x00) {
+			i = 0;
+			continue;
+		}
+
+		BUFFER[i++] = byte;
+		break;
+	}
+
+	// Read id, len1, len2.
+	while (i < 7) {
+		if (!stream->readBytes(&BUFFER[i], 1)) {
+			return -2;
+		}
+		i++;
+	}
+
+	int length = BUFFER[5] | (BUFFER[6] << 8);
+	int packetSize = length + 7;
+	if (length < 3 || packetSize > (int)SIZE) {
+		return -1;
+	}
+
+	while (i < packetSize) {
+		if (!stream->readBytes(&BUFFER[i], 1)) {
+			return -2;
+		}
+		i++;
+	}
+
+	return packetSize;
 }
 
 
@@ -359,7 +531,7 @@ XL330::Packet::Packet(
 	if (!data) {
 		// [ff][ff][fd][00][id][len1][len2] { [data(length)] }
 		this->data_size = 7 + length;
-		this->data = (unsigned char*)malloc(data_size);
+		this->data = (unsigned char*)malloc(this->data_size);
 		this->freeData = true;
 	}
 	else {
@@ -445,7 +617,19 @@ unsigned char XL330::Packet::getParameter(int n) {
 }
 
 bool XL330::Packet::isValid() {
+	if (this->data_size < 7) {
+		return false;
+	}
+	if (data[0] != 0xFF || data[1] != 0xFF || data[2] != 0xFD || data[3] != 0x00) {
+		return false;
+	}
+
 	int length = getLength();
+	int size = length + 7;
+	if (length < 3 || size > (int)this->data_size) {
+		return false;
+	}
+
 	unsigned short storedChecksum = data[length + 5] + (data[length + 6] << 8);
 	return storedChecksum == update_crc(0, data, length + 5);
 }
