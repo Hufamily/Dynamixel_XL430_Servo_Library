@@ -13,7 +13,7 @@ void setup() {
 }
 
 void loop() {
-  int vel = robot.getJointSpeed(servoID);
+  int32_t vel = robot.getJointSpeed(servoID);
   Serial.print("present velocity: ");
   Serial.println(vel);
   delay(250);

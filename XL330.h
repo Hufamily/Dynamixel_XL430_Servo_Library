@@ -95,8 +95,21 @@ private:
 	unsigned char Direction_Pin;
 	volatile char gbpParamEx[130+10];
 	Stream *stream;
+	unsigned long rx_timeout_ms;
+	int last_ping_result;
+	int last_ping_packet_size;
+	int last_ping_tx_size;
+	int last_ping_tx_written;
+	unsigned char last_ping_error_byte;
+	unsigned char last_ping_response_id;
+	unsigned char last_ping_instruction;
+	int last_ping_parameter_count;
+	unsigned char last_ping_raw[32];
+	int last_ping_raw_size;
 
   void nDelay(uint32_t nTime);
+	bool readByteWithTimeout(unsigned char* byte);
+	void clearRxBuffer();
 
 
 public:
@@ -104,12 +117,13 @@ public:
 	virtual ~XL330();	
 	
 	void begin(Stream &stream);
+	void setRxTimeout(unsigned long timeoutMs);
 	
 	void setBaudRate(int id, int value);
 	void setID(int id, int value);
 	void setControlMode(int id, int value);
 	
-	void setJointPosition(int id, int value);
+	void setJointPosition(int id, int32_t value);
 	void setJointSpeed(int id, int value);
 	
 	void LEDON(int id);
@@ -117,12 +131,15 @@ public:
 	void TorqueON(int id);
 	void TorqueOFF(int id);
 
-	int getJointPosition(int id);
-	int getJointSpeed(int id);
+	int32_t getJointPosition(int id);
+	int32_t getJointSpeed(int id);
 	int getJointTemperature(int id);
 	int isJointMoving(int id);
 
 	int ping(int id);
+	int getLastPingResult();
+	int getLastPingPacketSize();
+	void printLastPingDebug(Stream &out);
 	int action(int id);
 	int reboot(int id);
 	int factoryReset(int id, int option);
@@ -130,12 +147,12 @@ public:
 	int controlTableBackup(int id, int option);
 
 	int regWrite(int id, int Address, int value);
-	int regWrite_4bytes(int id, int Address, int value);
+	int regWrite_4bytes(int id, int Address, int32_t value);
 	int regWrite_1byte(int id, int Address, int value);
 
 	int sendPacket(int id, int Address, int value);
 	int readPacket(unsigned char *buffer, size_t size);
-	int sendPacket_4bytes(int id, int Address, int value);
+	int sendPacket_4bytes(int id, int Address, int32_t value);
 	int sendPacket_1byte(int id, int Address, int value);
 
 	int RXsendPacket(int id, int Address);

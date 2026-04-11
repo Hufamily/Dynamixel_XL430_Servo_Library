@@ -33,7 +33,20 @@
 
 
 XL330::XL330() {
-
+	this->stream = NULL;
+	this->rx_timeout_ms = 100;
+	this->last_ping_result = -99;
+	this->last_ping_packet_size = 0;
+	this->last_ping_tx_size = 0;
+	this->last_ping_tx_written = 0;
+	this->last_ping_error_byte = 0xFF;
+	this->last_ping_response_id = 0xFF;
+	this->last_ping_instruction = 0xFF;
+	this->last_ping_parameter_count = 0;
+	this->last_ping_raw_size = 0;
+	for (int i = 0; i < 32; i++) {
+		this->last_ping_raw[i] = 0;
+	}
 }
 
 XL330::~XL330() {
@@ -43,6 +56,10 @@ void XL330::begin(Stream& stream) {
 	//setDPin(Direction_Pin=4,OUTPUT);
 	//beginCom(1000000);
 	this->stream = &stream;
+}
+
+void XL330::setRxTimeout(unsigned long timeoutMs) {
+	this->rx_timeout_ms = timeoutMs;
 }
 
 void XL330::setBaudRate(int id, int value) {
@@ -72,7 +89,7 @@ void XL330::setControlMode(int id, int value) {
 	nDelay(NANO_TIME_DELAY);
 }
 
-void XL330::setJointPosition(int id, int value) {
+void XL330::setJointPosition(int id, int32_t value) {
 	int Address = XL_GOAL_POSITION;
 
 	sendPacket_4bytes(id, Address, value);
@@ -124,31 +141,83 @@ void XL330::TorqueOFF(int id) {
 	nDelay(NANO_TIME_DELAY);
 }
 
-int XL330::getJointPosition(int id) {
-	unsigned char buffer[255];
-	RXsendPacket(id, XL_PRESENT_POSITION, 4);
-	this->stream->flush();
-	nDelay(NANO_TIME_DELAY);
+int32_t XL330::getJointPosition(int id) {
+	const int maxAttempts = 2;
 
-	int packetSize = this->readPacket(buffer, sizeof(buffer));
-	if (packetSize <= 0) {
-		return -2;
+	for (int attempt = 0; attempt < maxAttempts; attempt++) {
+		unsigned char buffer[255];
+
+		clearRxBuffer();
+		RXsendPacket(id, XL_PRESENT_POSITION, 4);
+		this->stream->flush();
+		nDelay(NANO_TIME_DELAY);
+
+		int packetSize = this->readPacket(buffer, sizeof(buffer));
+		if (packetSize == -2) {
+			if (attempt < (maxAttempts - 1)) {
+				delay(2);
+				continue;
+			}
+			return -2; // timeout while waiting for response
+		}
+		if (packetSize <= 0 || packetSize < 14) {
+			if (attempt < (maxAttempts - 1)) {
+				delay(2);
+				continue;
+			}
+			return -3; // malformed or truncated packet
+		}
+
+		Packet p(buffer, packetSize);
+		if (!p.isValid()) {
+			if (attempt < (maxAttempts - 1)) {
+				delay(2);
+				continue;
+			}
+			return -4; // invalid packet CRC/header/length
+		}
+
+		if (p.getId() != id) {
+			if (attempt < (maxAttempts - 1)) {
+				delay(2);
+				continue;
+			}
+			return -5; // response from a different ID
+		}
+
+		if (p.getInstruction() != 0x55) {
+			if (attempt < (maxAttempts - 1)) {
+				delay(2);
+				continue;
+			}
+			return -6; // response is not a status packet
+		}
+
+		if (p.getParameterCount() < 5) {
+			if (attempt < (maxAttempts - 1)) {
+				delay(2);
+				continue;
+			}
+			return -7; // error byte + 4 data bytes required
+		}
+
+		int errorCode = p.getParameter(0);
+		if (errorCode != 0) {
+			return -10 - errorCode; // servo status error detail
+		}
+
+		int32_t value = (p.getParameter(1)) |
+			(p.getParameter(2) << 8) |
+			(p.getParameter(3) << 16) |
+			(p.getParameter(4) << 24);
+
+		return value;
 	}
 
-	Packet p(buffer, packetSize);
-	if (!p.isValid() || p.getInstruction() != 0x55 || p.getParameterCount() < 5 || p.getParameter(0) != 0) {
-		return -1;
-	}
-
-	int value = (p.getParameter(1)) |
-		(p.getParameter(2) << 8) |
-		(p.getParameter(3) << 16) |
-		(p.getParameter(4) << 24);
-
-	return value;
+	return -2;
 }
 
-int XL330::getJointSpeed(int id) {
+int32_t XL330::getJointSpeed(int id) {
 	unsigned char buffer[255];
 	RXsendPacket(id, XL_PRESENT_VELOCITY, 4);
 	this->stream->flush();
@@ -164,7 +233,7 @@ int XL330::getJointSpeed(int id) {
 		return -1;
 	}
 
-	int value = (p.getParameter(1)) |
+	int32_t value = (p.getParameter(1)) |
 		(p.getParameter(2) << 8) |
 		(p.getParameter(3) << 16) |
 		(p.getParameter(4) << 24);
@@ -211,13 +280,129 @@ int XL330::isJointMoving(int id) {
 }
 
 int XL330::ping(int id) {
-	const int bufsize = 10;
-	byte txbuffer[bufsize];
+	if (!stream) {
+		last_ping_result = -1;
+		last_ping_packet_size = 0;
+		last_ping_tx_size = 0;
+		last_ping_tx_written = 0;
+		last_ping_error_byte = 0xFF;
+		last_ping_response_id = 0xFF;
+		last_ping_instruction = 0xFF;
+		last_ping_parameter_count = 0;
+		last_ping_raw_size = 0;
+		return -1;
+	}
 
-	Packet p(txbuffer, bufsize, id, XL_INSTR_PING, 0);
-	int size = p.getSize();
-	stream->write(txbuffer, size);
-	return size;
+	const int txbufsize = 10;
+	byte txbuffer[txbufsize];
+
+	Packet p(txbuffer, txbufsize, id, XL_INSTR_PING, 0);
+	clearRxBuffer();
+	last_ping_tx_size = p.getSize();
+	last_ping_tx_written = (int)stream->write(txbuffer, p.getSize());
+	stream->flush();
+
+	unsigned char rxbuffer[32];
+	int packetSize = this->readPacket(rxbuffer, sizeof(rxbuffer));
+	last_ping_packet_size = packetSize;
+	last_ping_error_byte = 0xFF;
+	last_ping_response_id = 0xFF;
+	last_ping_instruction = 0xFF;
+	last_ping_parameter_count = 0;
+	last_ping_raw_size = 0;
+	for (int i = 0; i < 32; i++) {
+		last_ping_raw[i] = 0;
+	}
+	if (packetSize > 0) {
+		last_ping_raw_size = packetSize;
+		if (last_ping_raw_size > 32) {
+			last_ping_raw_size = 32;
+		}
+		for (int i = 0; i < last_ping_raw_size; i++) {
+			last_ping_raw[i] = rxbuffer[i];
+		}
+	}
+
+	if (packetSize < 14) {
+		last_ping_result = -2;
+		return -2;
+	}
+
+	Packet response(rxbuffer, packetSize);
+	if (!response.isValid()) {
+		last_ping_result = -3;
+		return -3;
+	}
+
+	last_ping_response_id = response.getId();
+	last_ping_instruction = response.getInstruction();
+	last_ping_parameter_count = response.getParameterCount();
+
+	if (response.getId() != id) {
+		last_ping_result = -4;
+		return -4;
+	}
+
+	if (response.getInstruction() != 0x55) {
+		last_ping_result = -5;
+		return -5;
+	}
+
+	if (response.getParameterCount() < 4) {
+		last_ping_result = -6;
+		return -6;
+	}
+
+	last_ping_error_byte = response.getParameter(0);
+	if (last_ping_error_byte != 0) {
+		last_ping_result = -7;
+		return -7;
+	}
+
+	last_ping_result = 1;
+	return 1;
+}
+
+int XL330::getLastPingResult() {
+	return last_ping_result;
+}
+
+int XL330::getLastPingPacketSize() {
+	return last_ping_packet_size;
+}
+
+void XL330::printLastPingDebug(Stream& out) {
+	out.print("ping result: ");
+	out.println(last_ping_result);
+	out.print("tx expected bytes: ");
+	out.println(last_ping_tx_size);
+	out.print("tx written bytes: ");
+	out.println(last_ping_tx_written);
+	out.print("rx packet size: ");
+	out.println(last_ping_packet_size);
+	out.print("rx id: 0x");
+	out.println(last_ping_response_id, HEX);
+	out.print("rx instruction: 0x");
+	out.println(last_ping_instruction, HEX);
+	out.print("rx parameter count: ");
+	out.println(last_ping_parameter_count);
+	out.print("rx error byte: 0x");
+	out.println(last_ping_error_byte, HEX);
+	out.print("raw rx bytes: ");
+	if (last_ping_raw_size <= 0) {
+		out.println("(none)");
+		return;
+	}
+	for (int i = 0; i < last_ping_raw_size; i++) {
+		if (last_ping_raw[i] < 0x10) {
+			out.print("0");
+		}
+		out.print(last_ping_raw[i], HEX);
+		if (i < (last_ping_raw_size - 1)) {
+			out.print(" ");
+		}
+	}
+	out.println();
 }
 
 int XL330::action(int id) {
@@ -301,7 +486,7 @@ int XL330::regWrite(int id, int Address, int value) {
 	return size;
 }
 
-int XL330::regWrite_4bytes(int id, int Address, int value) {
+int XL330::regWrite_4bytes(int id, int Address, int32_t value) {
 	// For sending 4-byte data with REG_WRITE instruction.
 	const int bufsize = 18;
 
@@ -356,7 +541,7 @@ int XL330::sendPacket(int id, int Address, int value) {
 	return size;
 }
 
-int XL330::sendPacket_4bytes(int id, int Address, int value) {
+int XL330::sendPacket_4bytes(int id, int Address, int32_t value) {
 	/*Dynamixel 2.0 communication protocol
 	  used by Dynamixel XL-330 and Dynamixel PRO only.
 	*/
@@ -438,7 +623,7 @@ int XL330::RXsendPacket(int id, int Address, int size) {
 }
 
 int XL330::readPacket(unsigned char* BUFFER, size_t SIZE) {
-	if (!BUFFER || SIZE < 10) {
+	if (!BUFFER || SIZE < 11) {
 		return -1;
 	}
 
@@ -447,7 +632,7 @@ int XL330::readPacket(unsigned char* BUFFER, size_t SIZE) {
 
 	// Find the protocol 2.0 header (FF FF FD 00).
 	while (true) {
-		if (!stream->readBytes(&byte, 1)) {
+		if (!readByteWithTimeout(&byte)) {
 			return -2;
 		}
 
@@ -494,7 +679,7 @@ int XL330::readPacket(unsigned char* BUFFER, size_t SIZE) {
 
 	// Read id, len1, len2.
 	while (i < 7) {
-		if (!stream->readBytes(&BUFFER[i], 1)) {
+		if (!readByteWithTimeout(&BUFFER[i])) {
 			return -2;
 		}
 		i++;
@@ -502,18 +687,47 @@ int XL330::readPacket(unsigned char* BUFFER, size_t SIZE) {
 
 	int length = BUFFER[5] | (BUFFER[6] << 8);
 	int packetSize = length + 7;
-	if (length < 3 || packetSize > (int)SIZE) {
+	if (length < 4 || length > 250 || packetSize > (int)SIZE) {
 		return -1;
 	}
 
 	while (i < packetSize) {
-		if (!stream->readBytes(&BUFFER[i], 1)) {
+		if (!readByteWithTimeout(&BUFFER[i])) {
 			return -2;
 		}
 		i++;
 	}
 
 	return packetSize;
+}
+
+bool XL330::readByteWithTimeout(unsigned char* byte) {
+	if (!stream || !byte) {
+		return false;
+	}
+
+	unsigned long start = millis();
+	while ((millis() - start) < rx_timeout_ms) {
+		if (stream->available() > 0) {
+			int value = stream->read();
+			if (value >= 0) {
+				*byte = (unsigned char)value;
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+void XL330::clearRxBuffer() {
+	if (!stream) {
+		return;
+	}
+
+	while (stream->available() > 0) {
+		stream->read();
+	}
 }
 
 
@@ -617,7 +831,7 @@ unsigned char XL330::Packet::getParameter(int n) {
 }
 
 bool XL330::Packet::isValid() {
-	if (this->data_size < 7) {
+	if (this->data_size < 10) {
 		return false;
 	}
 	if (data[0] != 0xFF || data[1] != 0xFF || data[2] != 0xFD || data[3] != 0x00) {

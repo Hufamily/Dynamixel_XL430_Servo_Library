@@ -13,8 +13,16 @@ void setup() {
 }
 
 void loop() {
-  int pos = robot.getJointPosition(servoID);
-  Serial.print("present position: ");
-  Serial.println(pos);
+  int32_t pos = robot.getJointPosition(servoID);
+  if (pos >= 0) {
+    Serial.print("present position: ");
+    Serial.println(pos);
+  } else if (pos <= -10) {
+    Serial.print("servo status error: ");
+    Serial.println((-10) - pos);
+  } else {
+    Serial.print("read error code: ");
+    Serial.println(pos);
+  }
   delay(250);
 }
