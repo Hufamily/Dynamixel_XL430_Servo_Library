@@ -1,9 +1,12 @@
 #include <XL330.h>
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
+#include <SoftwareSerialWithHalfDuplex.h>
 
 XL330 robot;
-SoftwareSerial mySerial(10, 11); // (RX, TX)
+//SoftwareSerial mySerial(10, 11); // (RX, TX)
+SoftwareSerialWithHalfDuplex mySerial(10,10,false,false);
 
+//Assumes servoID and servoBaud are already set
 const int servoID = 1;
 const long servoBaud = 115200;
 
@@ -14,7 +17,7 @@ const int32_t GOAL_POS_NEGATIVE = -8192; // -2 turns
 void setup() {
   Serial.begin(115200);
   mySerial.begin(servoBaud);
-  mySerial.listen();
+  //mySerial.listen();
 
   robot.begin(mySerial);
   robot.setRxTimeout(300);
@@ -25,14 +28,17 @@ void setup() {
   Serial.print("Baud: ");
   Serial.println(servoBaud);
 
-  pinMode(2, OUTPUT);
+  robot.LEDON(servoID);
+  delay(500);
+  robot.LEDOFF(servoID);
+  delay(500);
 
-  // Extended Position mode is Operating Mode 4.
+  // Extended Position mode is Operating Mode 4. Uncomment if operating mode needs to be changed
   //robot.TorqueOFF(servoID);
   //delay(100);
   //robot.setControlMode(servoID, 4);
   //delay(100);
-  //robot.TorqueON(servoID);
+  robot.TorqueON(servoID);
   //delay(100);
 
   // Set motion profile first (both are 4-byte values)
@@ -43,14 +49,12 @@ void setup() {
 }
 
 void loop() {
-  digitalWrite(2, HIGH);
   // Move +2 turns.
   robot.setJointPosition(servoID, GOAL_POS_POSITIVE);
   delay(2500);
+  Serial.println(robot.getJointPosition(servoID));
   // Move -2 turns.
   robot.setJointPosition(servoID, GOAL_POS_NEGATIVE);
   delay(2500);
-  digitalWrite(2, LOW); 
-  robot.setJointPosition(servoID, -4096*3);
-  delay(2500);
+  Serial.println(robot.getJointPosition(servoID));
 }
