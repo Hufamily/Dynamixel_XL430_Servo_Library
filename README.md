@@ -1,114 +1,153 @@
-Dynamixel XL-430
-================
-This library is developed based on the code from [Rei Lee](https://github.com/rei039474/Dynamixel_XL330_Servo_Library).
+# Dynamixel XL-430 Servo Library
 
+An Arduino library to control [Dynamixel XL-430-W250-T](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/)
+servos directly from a microcontroller over half-duplex TTL serial, using Dynamixel
+Protocol 2.0. It should also work with other X-series actuators (e.g. XL-330) since
+they share the same protocol and a very similar control table, though only the XL-430
+has been tested here.
 
-This is a library created to control Dynamixel XL-330 servos directly with microcontrollers. It works for [XL430-W250-T](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/) models and has been tested with Arduino boards. Please refer to Dynamixel website for more info about the servos.
+This library is based on code originally written for the XL-330 by
+[Rei Lee](https://github.com/rei039474/Dynamixel_XL330_Servo_Library).
 
-**It is still work in progress... not ready yet, but can be used for simple PWM and Position control.**
+**Work in progress.** Core position control, torque/LED control, and status reads have
+been tested end-to-end on real XL-430 hardware. Several other commands are implemented
+but not yet confirmed working — see [Status](#status) below.
 
-<img src="DYNAMIXEL_XL330.jpg" width="30%" alt="Dynamixel XL-330 servo" title="Dynamixel XL-330 servo">
+<img src="XL330_Arduino.jpg" width="50%" alt="Dynamixel X-series servo wired to a microcontroller" title="Dynamixel X-series servo wired to a microcontroller">
 
-<img src="XL330_Arduino.jpg" width="50%" alt="Dynamixel XL-330 servo library for microcontroller" title="Dynamixel XL-330 servo library for microcontroller">
+---------------
 
-
-# A XL-430 Servo library for Arduino
+## Installation
 
 Clone this repository into your Arduino IDE libraries folder:
 
-``` $ cd ~/Documents/Arduino/libraries/ ```
+```
+$ cd ~/Documents/Arduino/libraries/
+$ git clone <this repo>
+```
 
-Restart Arduino IDE after. Open the XL330 example sketches to see how they work:
+Restart the Arduino IDE afterward. You can then open the example sketches from:
 
-``` Arduino IDE > File > Examples > XL330-master ```
+```
+Arduino IDE > File > Examples > Dynamixel_XL430
+```
+
+The flagship example (`examples/xl430_extended_position_clear_multi_turn`) additionally
+depends on the [`SoftwareSerialWithHalfDuplex`](https://github.com/nickstedman/SoftwareSerialWithHalfDuplex)
+library for half-duplex serial over a single data pin — install that too if you plan to
+use a software serial pin rather than a hardware UART.
 
 ---------------
-
 
 ## Hardware
 
-Please refer to the e-manual for either [XL330-M077-T](https://emanual.robotis.com/docs/en/dxl/x/xl330-m077/) or [XL330-M288-T](https://emanual.robotis.com/docs/en/dxl/x/xl330-m288/) for detailed specifications and communication addresses from the Control Table of EEPROM Area.
-
----------------
+Refer to the e-manual for [XL430-W250-T](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/)
+for full specifications and the EEPROM/RAM control table addresses.
 
 ## Wiring Diagram
 
-XL330 servos can be connected in series and controlled at once.
+XL-430 servos can be daisy-chained on a single half-duplex serial bus and controlled
+individually by ID.
 
-<img src="https://emanual.robotis.com/assets/images/dxl/x/x_series_ttl_pin.png" width="30%" alt="Dynamixel XL-330 servo pinout" title="Dynamixel XL-330 servo pinout">
+<img src="https://emanual.robotis.com/assets/images/dxl/x/x_series_ttl_pin.png" width="30%" alt="Dynamixel X-series servo pinout" title="Dynamixel X-series servo pinout">
 
 * PIN1: GND
 * PIN2: VDD (5 volts)
-* PIN3: Data Serial RX TX
+* PIN3: Data (Serial RX/TX)
 
-When connecting to a microcontroller, the servo's Data pin will be connected to both the desired RX and TX pins. Depends on the code, they can be defined hardware serial pins or software serial pins. The wiring diagram below is based on the example code provided in the library.
+Since the servo has a single data pin, connect it to both the RX and TX pins of your
+microcontroller's chosen serial interface (hardware UART or a half-duplex software
+serial library — plain `SoftwareSerial` does not support half-duplex on one pin).
 
-<img src="XL330_wiring.png" width="100%" alt="Dynamixel XL-330 servo wiring" title="Dynamixel XL-330 servo wiring">
-
----------------
-
-## Example Sketches
-
-I have included some example sketches to help setup and test your servos. **All the example sketches are made for Arduino board, if using other microcontrollers, make sure the libraries used in the sketches are compatible for your board**. For example, the ```<SoftwareSerial.h>``` library does not work on EPS32 Board, need to be changed to ```<HardwareSerial.h>``` and declare the RX TX pins differently.
-
-
-### [Setting Servo's Serial Baud Rate & ServoID](https://github.com/rei039474/XL330_Microcontroller_Library/tree/master/examples/xl330_baud_rate_and_id)
-
-The out-of-box servo comes with default Baud Rate(8) = 57600 bps and default ServoID(7) = 1. 
-
-**Set up one servo at a time to desired ServoID without connecting several of them in series.**
-
-```XL330_baud_rate_and_id.ino```
-
-Follow the instructions in the example sketch and change the setting based on your own needs. After uploading the sketch, remember to power-cycle the microcontroller in between setting anything.
-
-NOTE: The example sketch includes the blinking of LED on the servo as an indicator of whether the setting successfully changes.
-
-===============
-
-### [Simple Position Control with Potentiometer](https://github.com/rei039474/XL330_Microcontroller_Library/tree/master/examples/xl330_position_control)
-
-The out-of-box servo comes with default Operating Mode(11) = 3. Position Control Mode.
-
-Operating Mode Options: 0: current; 1: velocity; 3: position; 4: extended position; 5: current-base position; 16: PWM
-
-```XL330_position_control.ino```
-
-I used a potentiometer as the input value in the sketch, but you can send command with value directly if wanted.
-
-The value range for [XL330 position control](https://emanual.robotis.com/docs/en/dxl/x/xl330-m077/#goal-position116) is ```0 ~ 4095``` mapping ```0 ~ 360 [°]```  with following command line:
-
-```robot.setJointPosition(servoID, value);```
-
-===============
-
-### [Simple PWM Control with Potentiometer](https://github.com/rei039474/XL330_Microcontroller_Library/tree/master/examples/xl330_PWM_control)
-
-The out-of-box servo comes with default Operating Mode(11) = 3. Position Control Mode.
-
-Operating Mode Options: 0: current; 1: velocity; 3: position; 4: extended position; 5: current-base position; 16: PWM
-
-```XL330_PWM_control.ino```
-
-I used a potentiometer as the input value in the sketch, but you can send command with value directly if wanted.
-
-The value range for [XL330 PWM control](https://emanual.robotis.com/docs/en/dxl/x/xl330-m077/#goal-pwm100) is ```-885 ~ 885``` with following command line:
-
-```robot.setJointSpeed(servoID, value);```
+<img src="XL330_wiring.png" width="100%" alt="Example wiring between a microcontroller and a Dynamixel X-series servo" title="Example wiring between a microcontroller and a Dynamixel X-series servo">
 
 ---------------
 
-## More information
+## Status
 
-The example sketches provide the preset commands for XL330. If you want to control other settings on different addresses, check the address value from [XL330 Address Table](https://emanual.robotis.com/docs/en/dxl/x/xl330-m077/#control-table-of-eeprom-area), and use the following command line with corresponding data size for the address:
+**Confirmed working** (tested against real XL-430 hardware):
 
+- `setJointPosition` / `getJointPosition`, including extended (multi-turn) position mode
+- `clearMultiTurnInfo`
+- `TorqueON` / `TorqueOFF`
+- `LEDON` / `LEDOFF`
+- `ping`
+- Raw register access: `sendPacket`, `sendPacket_1byte`, `sendPacket_4bytes`
+
+**Implemented but not yet verified:**
+
+- `setJointSpeed` (PWM control)
+- `setBaudRate` / `setID` / `setControlMode` (EEPROM writes)
+- `getJointSpeed`, `getJointTemperature`, `isJointMoving`
+- `reboot`, `factoryReset`, `controlTableBackup`
+- `regWrite` / `regWrite_1byte` / `regWrite_4bytes`
+
+Sketches exercising the unverified commands live in [`examples/debug`](examples/debug),
+each isolated to one command, along with notes on which ones are EEPROM-risky. Treat
+that folder as a bring-up/debugging aid, not a set of working demos.
+
+---------------
+
+## Example: Extended Position Control
+
+[`examples/xl430_extended_position_clear_multi_turn`](examples/xl430_extended_position_clear_multi_turn)
+is the reference example — it puts the servo in Extended Position Control Mode
+(Operating Mode 4), then repeatedly commands it between +2 and -2 turns while printing
+the present position back over `Serial`.
+
+```cpp
+#include <XL430.h>
+#include <SoftwareSerialWithHalfDuplex.h>
+
+XL430 robot;
+SoftwareSerialWithHalfDuplex mySerial(10, 10, false, false);
+
+const int servoID = 1;
+const long servoBaud = 115200;
+
+void setup() {
+  mySerial.begin(servoBaud);
+  robot.begin(mySerial);
+  robot.TorqueON(servoID);
+}
+
+void loop() {
+  robot.setJointPosition(servoID, 8192);   // +2 turns (SDK-style raw units, 4096 counts/turn)
+  delay(2500);
+  robot.setJointPosition(servoID, -8192);  // -2 turns
+  delay(2500);
+}
 ```
-//for sending 2 bytes data 
-robot.sendPacket(int id, int Address, int value);
 
-//for sending 1 byte data 
-robot.sendPacket_1byte(int id, int Address, int value);
+Operating mode must already be set to Extended Position (4) before running this —
+either via the Dynamixel Wizard, or by uncommenting the `setControlMode` call in the
+sketch (an EEPROM write; do this once, with a single servo connected).
 
-//for sending 4 bytes data 
-robot.sendPacket_4bytes(int id, int Address, int value);
+Operating Mode reference: `0` current, `1` velocity, `3` position, `4` extended
+position, `5` current-based position, `16` PWM.
+
+---------------
+
+## API Reference
+
+Position and PWM control go through dedicated helpers:
+
+```cpp
+robot.setJointPosition(id, value); // goal position, raw units (0-4095 per turn in Position mode)
+robot.setJointSpeed(id, value);    // goal PWM, -885 ~ 885
+```
+
+For any other control table address, look up the value from the
+[XL-430 control table](https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/#control-table-of-eeprom-area)
+(or use the `XL430_*` constants defined in `XL430.h`) and send it directly:
+
+```cpp
+// 2-byte data
+robot.sendPacket(int id, int address, int value);
+
+// 1-byte data
+robot.sendPacket_1byte(int id, int address, int value);
+
+// 4-byte data
+robot.sendPacket_4bytes(int id, int address, int32_t value);
 ```

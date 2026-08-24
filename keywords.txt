@@ -1,0 +1,65 @@
+#######################################
+# Syntax Coloring Map for Dynamixel_XL430
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+XL430	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+setRxTimeout	KEYWORD2
+setBaudRate	KEYWORD2
+setID	KEYWORD2
+setControlMode	KEYWORD2
+setJointPosition	KEYWORD2
+setJointSpeed	KEYWORD2
+LEDON	KEYWORD2
+LEDOFF	KEYWORD2
+TorqueON	KEYWORD2
+TorqueOFF	KEYWORD2
+getJointPosition	KEYWORD2
+getJointSpeed	KEYWORD2
+getJointTemperature	KEYWORD2
+isJointMoving	KEYWORD2
+ping	KEYWORD2
+getLastPingResult	KEYWORD2
+getLastPingPacketSize	KEYWORD2
+printLastPingDebug	KEYWORD2
+action	KEYWORD2
+reboot	KEYWORD2
+factoryReset	KEYWORD2
+clearMultiTurnInfo	KEYWORD2
+controlTableBackup	KEYWORD2
+regWrite	KEYWORD2
+regWrite_4bytes	KEYWORD2
+regWrite_1byte	KEYWORD2
+sendPacket	KEYWORD2
+readPacket	KEYWORD2
+sendPacket_4bytes	KEYWORD2
+sendPacket_1byte	KEYWORD2
+RXsendPacket	KEYWORD2
+flush	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+XL430_GOAL_POSITION	LITERAL1
+XL430_GOAL_PWM	LITERAL1
+XL430_GOAL_VELOCITY	LITERAL1
+XL430_GOAL_CURRENT	LITERAL1
+XL430_PRESENT_POSITION	LITERAL1
+XL430_PRESENT_VELOCITY	LITERAL1
+XL430_PRESENT_TEMPERATURE	LITERAL1
+XL430_TORQUE_ENABLE	LITERAL1
+XL430_LED	LITERAL1
+XL430_MOVING	LITERAL1
+XL430_BAUD_RATE	LITERAL1
+XL430_ID	LITERAL1
+XL430_CONTROL_MODE	LITERAL1
